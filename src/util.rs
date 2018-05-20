@@ -21,7 +21,7 @@ pub(crate) fn is_redirect_method_get(status: StatusCode, method: &Method) -> boo
 pub(crate) fn is_chunked(values: GetAll<HeaderValue>) -> bool {
     if let Some(last) = values.iter().last() {
         if let Ok(s) = last.to_str() {
-            return s.ends_with("chunked")
+            return s.ends_with("chunked");
         }
     }
     false

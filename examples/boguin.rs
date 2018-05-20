@@ -47,7 +47,7 @@ fn build_request(matches: ArgMatches) -> Result<Request<Vec<u8>>, String> {
 }
 
 fn print_response(response: &Response<Vec<u8>>) {
-    // Note: Writes to stderr always succeed. 
+    // Note: Writes to stderr always succeed.
     let mut stderr = io::stderr();
     writeln!(stderr, "{:?} {}", response.version(), response.status()).unwrap();
     for (key, value) in response.headers() {

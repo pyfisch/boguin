@@ -75,7 +75,10 @@ impl<R> Body<R> {
                     reader,
                 });
             } else {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, Error::BadResponse));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    Error::BadResponse,
+                ));
             }
         }
         // (6. request only)
@@ -121,7 +124,10 @@ impl FromBody for () {
         if body.is_none() {
             Ok(())
         } else {
-            Err(io::Error::new(io::ErrorKind::InvalidData, Error::BadResponse))
+            Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                Error::BadResponse,
+            ))
         }
     }
 }

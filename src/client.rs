@@ -11,7 +11,7 @@ use http1;
 use util::{is_persistent_connection, is_redirect_method_get, is_redirect_status, wrap_error};
 
 /// A HTTP(S) client.
-/// 
+///
 /// Use `Client::new().fetch(request)` to make a single request.
 pub struct Client {
     tcp_streams: HashMap<Origin, TcpStream>,
@@ -21,7 +21,7 @@ pub struct Client {
 
 impl Client {
     /// Creates a new client.
-    /// 
+    ///
     /// Try to use a client for multiple connections as the client may
     /// be able to reuse existing connections.
     pub fn new() -> Client {
@@ -65,7 +65,10 @@ impl Client {
         counter: u8,
     ) -> io::Result<Response<B>> {
         if counter >= 20 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, Error::TooManyRedirects));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                Error::TooManyRedirects,
+            ));
         }
         let response = self.fetch_network(&mut request)?;
         if is_redirect_status(response.status()) {
@@ -73,11 +76,21 @@ impl Client {
                 let location_url = wrap_error(request.url().join(wrap_error(location.to_str())?))?;
                 *request.url_mut() = location_url;
             } else {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, Error::BadResponse));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    Error::BadResponse,
+                ));
             }
-            info!("Following '{}' redirect to {}", response.status(), request.url());
+            info!(
+                "Following '{}' redirect to {}",
+                response.status(),
+                request.url()
+            );
             if is_redirect_method_get(response.status(), request.method()) {
-                info!("Method changed in redirect from {} to GET", request.method());
+                info!(
+                    "Method changed in redirect from {} to GET",
+                    request.method()
+                );
                 let head = request.into_parts().0;
                 let mut request = Request::from_parts(head, ());
                 *request.method_mut() = Method::GET;
@@ -99,7 +112,10 @@ impl Client {
         } else if request.url().scheme() == "https" {
             self.fetch_network_https(request)
         } else {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, Error::WrongScheme));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                Error::WrongScheme,
+            ));
         }
     }
 
@@ -188,12 +204,12 @@ impl Default for Client {
 }
 
 /// HTTP specific errors.
-/// 
+///
 /// These are used together with an `ErrorKind` in an `io::Error`.
 /// The `ErrorKind` is usually either `InvalidInput` when the
 /// user of the crate provided invalid info for a request or
 /// `InvalidData` when the server returned wrong or broken info.
-/// 
+///
 /// Many other Errors are just wrapped inside an `io::Error`.
 /// They originate from a dependency and are not part of
 /// the public API.
@@ -202,20 +218,20 @@ impl Default for Client {
 #[derive(Debug)]
 pub enum Error {
     /// An invalid scheme was encountered in a request URL.
-    /// 
+    ///
     /// Currently allowed are only HTTP and HTTPS.
     WrongScheme,
     /// URL contains no domain.
-    /// 
+    ///
     /// TLS requires a domain name to verify the certificate.
     /// If the URL contains an IP address it has no domain.
     NoDomain,
     /// The client tried to follow too many redirects and gave up.
-    /// 
+    ///
     /// Current limit is 20 redirects maximum.
     TooManyRedirects,
     /// There was some logic error in the response received.
-    /// 
+    ///
     /// Such problems may not always raise this error but
     /// instead provide more specific information from the original error.
     BadResponse,
@@ -240,4 +256,3 @@ impl ::std::fmt::Display for Error {
         f.write_str(::std::error::Error::description(self))
     }
 }
-

@@ -75,7 +75,12 @@ pub fn read_chunked_body<R: BufRead>(
                             consumed
                         }
                         Ok(Status::Partial) => return Err(io::ErrorKind::Interrupted.into()),
-                        _ => return Err(io::Error::new(io::ErrorKind::InvalidData, Error::BadResponse)),
+                        _ => {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                Error::BadResponse,
+                            ))
+                        }
                     }
                 };
                 reader.consume(consumed_len);
@@ -91,7 +96,10 @@ pub fn read_chunked_body<R: BufRead>(
                 if buf[..1] != [b'\r', b'\n'] {
                     reader.consume(2);
                 } else {
-                    return Err(io::Error::new(io::ErrorKind::InvalidData, Error::BadResponse));
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        Error::BadResponse,
+                    ));
                 }
                 *chunk_len = 0;
             }
