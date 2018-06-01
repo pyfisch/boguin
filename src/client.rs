@@ -3,10 +3,11 @@ use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::net::TcpStream;
 
 use http::{header, Method, Request, Response};
+use http::header::HeaderValue;
 use http::url::Origin;
 use native_tls::{HandshakeError, TlsConnector, TlsStream};
 
-use body::{Body, FromBody};
+use body::{Body, FromBody, ToBody};
 use http1;
 use util::{is_persistent_connection, is_redirect_method_get, is_redirect_status, wrap_error};
 
@@ -48,7 +49,7 @@ impl Client {
     /// If possible it will reuse connections from the same client.
     /// The client follows up to 20 redirects.
     /// The body is automatically converted to the expected format.
-    pub fn fetch<A, B: FromBody>(&mut self, request: Request<A>) -> io::Result<Response<B>> {
+    pub fn fetch<A: ToBody, B: FromBody>(&mut self, request: Request<A>) -> io::Result<Response<B>> {
         info!("Fetching {} {}", request.method(), request.url());
         match self.fetch_redirect(request, 0) {
             Ok(response) => Ok(response),
@@ -59,7 +60,7 @@ impl Client {
         }
     }
 
-    fn fetch_redirect<A, B: FromBody>(
+    fn fetch_redirect<A: ToBody, B: FromBody>(
         &mut self,
         mut request: Request<A>,
         counter: u8,
@@ -103,7 +104,7 @@ impl Client {
         }
     }
 
-    fn fetch_network<A, B: FromBody>(
+    fn fetch_network<A: ToBody, B: FromBody>(
         &mut self,
         request: &mut Request<A>,
     ) -> io::Result<Response<B>> {
@@ -119,7 +120,7 @@ impl Client {
         }
     }
 
-    fn fetch_network_http<A, B: FromBody>(
+    fn fetch_network_http<A: ToBody, B: FromBody>(
         &mut self,
         request: &mut Request<A>,
     ) -> io::Result<Response<B>> {
@@ -143,7 +144,7 @@ impl Client {
         Ok(response)
     }
 
-    fn fetch_network_https<A, B: FromBody>(
+    fn fetch_network_https<A: ToBody, B: FromBody>(
         &mut self,
         request: &mut Request<A>,
     ) -> io::Result<Response<B>> {
@@ -180,14 +181,17 @@ impl Client {
         Ok(response)
     }
 
-    fn fetch_data<A, B: FromBody, S: Read + Write>(
+    fn fetch_data<A: ToBody, B: FromBody, S: Read + Write>(
         request: &mut Request<A>,
         mut stream: S,
     ) -> io::Result<Response<B>> {
         {
             let mut buf_writer = BufWriter::new(&mut stream);
+            let body = request.body().len();
+            request.headers_mut().insert(header::CONTENT_LENGTH, HeaderValue::from_str(body.to_string().as_str()).expect("integer is valid header"));
             http1::write_request_header(&mut buf_writer, &request)?;
             buf_writer.flush()?;
+            buf_writer.write_all(request.body().to_body())?;
         }
         let mut buf_reader = BufReader::new(&mut stream);
         let parts = http1::read_response_header(&mut buf_reader)?;

@@ -149,3 +149,38 @@ impl FromBody for String {
         Ok(data)
     }
 }
+
+pub trait ToBody {
+    fn to_body(&self) -> &[u8];
+    fn len(&self) -> usize;
+}
+
+impl ToBody for () {
+    fn to_body(&self) -> &[u8] {
+        &[]
+    }
+
+    fn len(&self) -> usize {
+        0
+    }
+}
+
+impl ToBody for Vec<u8> {
+    fn to_body(&self) -> &[u8] {
+        &self[..]
+    }
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ToBody for String {
+    fn to_body(&self) -> &[u8] {
+        self.as_bytes()
+    }
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+}
