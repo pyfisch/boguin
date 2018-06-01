@@ -1,4 +1,4 @@
-extern crate http;
+extern crate http_with_url as http;
 extern crate httparse;
 #[macro_use]
 extern crate log;

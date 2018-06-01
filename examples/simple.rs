@@ -1,5 +1,5 @@
 extern crate boguin;
-extern crate http;
+extern crate http_with_url as http;
 
 fn main() {
     let mut client = boguin::Client::new();

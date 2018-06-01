@@ -1,7 +1,7 @@
 extern crate boguin;
 extern crate clap;
 extern crate env_logger;
-extern crate http;
+extern crate http_with_url as http;
 #[macro_use]
 extern crate log;
 

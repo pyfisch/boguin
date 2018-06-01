@@ -3,9 +3,12 @@ name = "boguin"
 version = "0.1.0"
 authors = ["Pyfisch <pyfisch@gmail.com>"]
 repository = "https://github.com/pyfisch/boguin"
+description = "simple HTTP client"
+license = "MIT/Apache-2.0"
+keywords = ["http", "client"]
 
 [dependencies]
-http = { path = "../http-with-url" }
+http-with-url = "0.2.0"
 httparse = "1.2.4"
 log = "0.4.1"
 native-tls = "0.1.5"
