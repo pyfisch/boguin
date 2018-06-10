@@ -218,14 +218,23 @@ impl Client {
         let mut config = rustls::ClientConfig::new();
         config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
 
-        let mut sess_and_sock= {
-            let domain = request.url().domain().unwrap();
-            let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain).unwrap();
-            let mut sess = rustls::ClientSession::new(&Arc::new(config), dns_name);
-            let mut sock = TcpStream::connect(format!("{}:443", domain)).unwrap();
-            (sess, sock)    
-        };
-        let mut tls_stream = rustls::Stream::new(&mut sess_and_sock.0, &mut sess_and_sock.1);
+        let (mut sess, mut sock) = {
+           let domain = if let Some(domain) = request.url().domain() {
+               domain
+           } else {
+               return Err(io::Error::new(io::ErrorKind::InvalidInput, Error::NoDomain));
+           };
+
+           let mut config = rustls::ClientConfig::new();
+
+           config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+
+           let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain).unwrap();
+           let mut sess = rustls::ClientSession::new(&Arc::new(config), dns_name);
+           let mut sock = TcpStream::connect(format!("{}:443", domain)).unwrap();
+           (sess, sock)
+       };
+       let mut tls_stream = rustls::Stream::new(&mut sess, &mut sock);
         
         let response = Client::fetch_data(request, &mut tls_stream)?;
         if is_persistent_connection(
