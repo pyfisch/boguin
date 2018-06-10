@@ -5,7 +5,18 @@ use std::net::TcpStream;
 use http::{header, Method, Request, Response};
 use http::header::HeaderValue;
 use http::url::Origin;
+
+#[cfg(not(feature="rust_tls"))]
 use native_tls::{HandshakeError, TlsConnector, TlsStream};
+
+#[cfg(feature="rust_tls")]
+use rustls;
+#[cfg(feature="rust_tls")]
+use std::sync::Arc;
+#[cfg(feature="rust_tls")]
+use webpki;
+#[cfg(feature="rust_tls")]
+use webpki_roots;
 
 use body::{Body, FromBody, ToBody};
 use http1;
@@ -14,10 +25,16 @@ use util::{is_persistent_connection, is_redirect_method_get, is_redirect_status,
 /// A HTTP(S) client.
 ///
 /// Use `Client::new().fetch(request)` to make a single request.
+#[cfg(not(feature="rust_tls"))]
 pub struct Client {
     tcp_streams: HashMap<Origin, TcpStream>,
     tls_streams: HashMap<Origin, TlsStream<TcpStream>>,
     tls_connector: Option<TlsConnector>,
+}
+
+#[cfg(feature="rust_tls")]
+pub struct Client {
+    tcp_streams: HashMap<Origin, TcpStream>,
 }
 
 impl Client {
@@ -25,6 +42,7 @@ impl Client {
     ///
     /// Try to use a client for multiple connections as the client may
     /// be able to reuse existing connections.
+    #[cfg(not(feature="rust_tls"))]
     pub fn new() -> Client {
         Client {
             tcp_streams: HashMap::new(),
@@ -33,6 +51,14 @@ impl Client {
         }
     }
 
+    #[cfg(feature="rust_tls")]
+    pub fn new() -> Client {
+        Client {
+            tcp_streams: HashMap::new(),
+        }
+    }
+
+    #[cfg(not(feature="rust_tls"))]
     fn get_tls_connector(&mut self) -> io::Result<&TlsConnector> {
         if let Some(ref connector) = self.tls_connector {
             return Ok(connector);
@@ -144,6 +170,7 @@ impl Client {
         Ok(response)
     }
 
+    #[cfg(not(feature="rust_tls"))]
     fn fetch_network_https<A: ToBody, B: FromBody>(
         &mut self,
         request: &mut Request<A>,
@@ -175,6 +202,47 @@ impl Client {
         ) {
             debug!("Keeping secure connection to {:?} for later use", origin);
             self.tls_streams.insert(origin, tls_stream);
+        } else {
+            debug!("Closed secure connection to {:?}", origin);
+        }
+        Ok(response)
+    }
+
+    #[cfg(feature="rust_tls")]
+    fn fetch_network_https<A: ToBody, B: FromBody>(
+    &mut self,
+        request: &mut Request<A>,
+    ) -> io::Result<Response<B>> {
+        let origin = request.url().origin();
+                
+        let mut config = rustls::ClientConfig::new();
+        config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+
+        let (mut sess, mut sock) = {
+           let domain = if let Some(domain) = request.url().domain() {
+               domain
+           } else {
+               return Err(io::Error::new(io::ErrorKind::InvalidInput, Error::NoDomain));
+           };
+
+           let mut config = rustls::ClientConfig::new();
+
+           config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+
+           let dns_name = webpki::DNSNameRef::try_from_ascii_str(domain).unwrap();
+           let mut sess = rustls::ClientSession::new(&Arc::new(config), dns_name);
+           let mut sock = TcpStream::connect(format!("{}:443", domain)).unwrap();
+           (sess, sock)
+       };
+       let mut tls_stream = rustls::Stream::new(&mut sess, &mut sock);
+        
+        let response = Client::fetch_data(request, &mut tls_stream)?;
+        if is_persistent_connection(
+            response.version(),
+            response.headers().get_all(header::CONNECTION),
+        ) {
+            debug!("Keeping secure connection to {:?} for later use", origin);
+           // self.tls_streams.insert(origin, tls_stream);
         } else {
             debug!("Closed secure connection to {:?}", origin);
         }
